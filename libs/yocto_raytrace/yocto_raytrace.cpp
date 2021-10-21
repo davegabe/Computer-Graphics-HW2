@@ -73,11 +73,11 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
   auto material = scene.materials[instance.material];
   auto normal   = transform_direction(
       instance.frame, eval_normal(shape, isec.element, isec.uv));
-  auto coord    = eval_texcoord(shape, isec.element, isec.uv);
   auto position = transform_point(
-      instance.frame, eval_position(shape, isec.element, isec.uv));  // BOH
+      instance.frame, eval_position(shape, isec.element, isec.uv));
   auto color = material.color *
-               xyz(eval_texture(scene, material.color_tex, isec.uv));
+               xyz(eval_texture(scene, material.color_tex,
+                   eval_texcoord(shape, isec.element, isec.uv)));
 
   auto radiance   = material.emission;
   auto max_bounce = params.bounces;
@@ -93,11 +93,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     }
     case material_type::reflective: {
       if (material.roughness) {
-        auto incoming = reflect(ray.o, normal);
-        radiance += fresnel_schlick(color, normal, ray.o) *
-                    xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                        bounce + 1, rng, params));
-      } else {
         auto incoming = sample_hemisphere(normal, rand2f(rng));
         auto halfway  = normalize(ray.o + incoming);
         radiance += (2 * pi) * fresnel_schlick(color, halfway, ray.o) *
@@ -109,6 +104,11 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
                     xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                         bounce + 1, rng, params)) *
                     dot(normal, incoming);
+      } else {
+        auto incoming = reflect(ray.o, normal);
+        radiance += fresnel_schlick(color, normal, ray.o) *
+                    xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
+                        bounce + 1, rng, params));
       }
       break;
     }
