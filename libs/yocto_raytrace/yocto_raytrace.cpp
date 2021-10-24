@@ -68,45 +68,50 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     auto env = eval_environment(scene, ray.d);
     return {env.x, env.y, env.z, 1};
   }
-  auto instance = scene.instances[isec.instance];
-  auto shape    = scene.shapes[instance.shape];
-  auto material = scene.materials[instance.material];
-  auto normal   = transform_direction(
+  auto& instance = scene.instances[isec.instance];
+  auto& shape    = scene.shapes[instance.shape];
+  auto& material = eval_material(scene, instance, isec.element, isec.uv);
+  auto  normal   = transform_direction(
       instance.frame, eval_normal(shape, isec.element, isec.uv));
   auto position = transform_point(
       instance.frame, eval_position(shape, isec.element, isec.uv));
-  auto color = material.color *
-               xyz(eval_texture(scene, material.color_tex,
-                   eval_texcoord(shape, isec.element, isec.uv)));
+  auto color = material.color;
 
-  auto radiance   = material.emission;
-  auto max_bounce = params.bounces;
-  if (bounce >= max_bounce) return {radiance.x, radiance.y, radiance.z, 1};
+  if (rand1f(rng) < 1 - material.opacity) {
+    return shade_raytrace(
+        scene, bvh, ray3f{position, ray.d}, bounce + 1, rng, params);
+  }
 
+  auto radiance = material.emission;
+  if (bounce >= params.bounces) return {radiance.x, radiance.y, radiance.z, 1};
+
+  auto outgoing = -ray.d;
   switch (material.type) {
     case material_type::matte: {
-      auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
-      radiance += color *
+      auto incoming = sample_hemisphere(normal, rand2f(rng));
+      radiance += (2 * pi) * color / pi *
                   xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                      bounce + 1, rng, params));
+                      bounce + 1, rng, params)) *
+                  dot(normal, incoming);
       break;
     }
     case material_type::reflective: {
-      if (material.roughness) {
-        auto incoming = sample_hemisphere(normal, rand2f(rng));
-        auto halfway  = normalize(ray.o + incoming);
-        radiance += (2 * pi) * fresnel_schlick(color, halfway, ray.o) *
-                    microfacet_distribution(
-                        material.roughness, normal, halfway) *
-                    microfacet_shadowing(
-                        material.roughness, normal, halfway, ray.o, incoming) /
-                    (4 * dot(normal, ray.o) * dot(normal, incoming)) *
-                    xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                        bounce + 1, rng, params)) *
-                    dot(normal, incoming);
+      if (material.roughness > 0) {
+        auto incoming = sample_hemisphere_cospower(
+            2 / pow(material.roughness, 2), normal, rand2f(rng));
+        auto halfway  = normalize(outgoing + incoming);
+        radiance +=
+            (2 * pi) * fresnel_schlick(color, halfway, outgoing) *
+            microfacet_distribution(material.roughness, normal, halfway) *
+            microfacet_shadowing(
+                material.roughness, normal, halfway, outgoing, incoming) /
+            (4 * dot(normal, outgoing) * dot(normal, incoming)) *
+            xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
+                bounce + 1, rng, params)) *
+            dot(normal, incoming);
       } else {
-        auto incoming = reflect(ray.o, normal);
-        radiance += fresnel_schlick(color, normal, ray.o) *
+        auto incoming = reflect(outgoing, normal);
+        radiance += fresnel_schlick(color, normal, outgoing) *
                     xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                         bounce + 1, rng, params));
       }
@@ -114,15 +119,15 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     }
     case material_type::glossy: {
       auto incoming = sample_hemisphere(normal, rand2f(rng));
-      auto halfway  = normalize(ray.o + incoming);
+      auto halfway  = normalize(outgoing + incoming);
       radiance +=
           (2 * pi) *
-          (color / pi * (1 - fresnel_schlick(vec3f{0.04}, halfway, ray.o)) +
-              fresnel_schlick(vec3f{0.04}, halfway, ray.o) *
+          (color / pi * (1 - fresnel_schlick(vec3f{0.04}, halfway, outgoing)) +
+              fresnel_schlick(vec3f{0.04}, halfway, outgoing) *
                   microfacet_distribution(material.roughness, normal, halfway) *
                   microfacet_shadowing(
-                      material.roughness, normal, halfway, ray.o, incoming) /
-                  (4 * dot(normal, ray.o) * dot(normal, incoming))) *
+                      material.roughness, normal, halfway, outgoing, incoming) /
+                  (4 * dot(normal, outgoing) * dot(normal, incoming))) *
           xyz(shade_raytrace(
               scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params)) *
           dot(normal, incoming);
@@ -130,13 +135,13 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     }
     case material_type::transparent: {
       auto min3f = min(
-          rand3f(rng), fresnel_schlick(vec3f{0.04}, normal, ray.o));
+          rand3f(rng), fresnel_schlick(vec3f{0.04}, normal, outgoing));
       if (rand3f(rng) == min3f) {
-        auto incoming = reflect(ray.o, normal);
+        auto incoming = reflect(outgoing, normal);
         radiance += xyz(shade_raytrace(
             scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
       } else {
-        auto incoming = -ray.o;
+        auto incoming = -outgoing;
         radiance += color *
                     xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                         bounce + 1, rng, params));
@@ -161,10 +166,10 @@ static vec4f shade_eyelight(const scene_data& scene, const bvh_scene& bvh,
     const raytrace_params& params) {
   auto isec = intersect_bvh(bvh, scene, ray);
   if (!isec.hit) return {0, 0, 0, 0};
-  auto instance = scene.instances[isec.instance];
-  auto shape    = scene.shapes[instance.shape];
-  auto material = scene.materials[instance.material];
-  auto normal   = transform_direction(
+  auto& instance = scene.instances[isec.instance];
+  auto& shape    = scene.shapes[instance.shape];
+  auto& material = scene.materials[instance.material];
+  auto  normal   = transform_direction(
       instance.frame, eval_normal(shape, isec.element, isec.uv));
   auto color = material.color * dot(normal, -ray.d);
   return vec4f{color.x, color.y, color.z, 1};
@@ -175,9 +180,9 @@ static vec4f shade_normal(const scene_data& scene, const bvh_scene& bvh,
     const raytrace_params& params) {
   auto isec = intersect_bvh(bvh, scene, ray);
   if (!isec.hit) return {0, 0, 0, 0};
-  auto instance = scene.instances[isec.instance];
-  auto shape    = scene.shapes[instance.shape];
-  auto normal   = transform_direction(
+  auto& instance = scene.instances[isec.instance];
+  auto& shape    = scene.shapes[instance.shape];
+  auto  normal   = transform_direction(
       instance.frame, eval_normal(shape, isec.element, isec.uv));
   normal = normal * 0.5 + 0.5;
   return vec4f{normal.x, normal.y, normal.z, 1};
@@ -188,9 +193,9 @@ static vec4f shade_texcoord(const scene_data& scene, const bvh_scene& bvh,
     const raytrace_params& params) {
   auto isec = intersect_bvh(bvh, scene, ray);
   if (!isec.hit) return {0, 0, 0, 0};
-  auto instance = scene.instances[isec.instance];
-  auto shape    = scene.shapes[instance.shape];
-  auto coord    = eval_texcoord(shape, isec.element, isec.uv);
+  auto& instance = scene.instances[isec.instance];
+  auto& shape    = scene.shapes[instance.shape];
+  auto  coord    = eval_texcoord(shape, isec.element, isec.uv);
   return {fmod(coord.x, 1), fmod(coord.y, 1), 0, 1};
 }
 
@@ -199,8 +204,8 @@ static vec4f shade_color(const scene_data& scene, const bvh_scene& bvh,
     const raytrace_params& params) {
   auto isec = intersect_bvh(bvh, scene, ray);
   if (!isec.hit) return {0, 0, 0, 0};
-  auto instance = scene.instances[isec.instance];
-  auto color    = scene.materials[instance.material].color;
+  auto& instance = scene.instances[isec.instance];
+  auto  color    = scene.materials[instance.material].color;
   return vec4f{color.x, color.y, color.z, 1};
 }
 
