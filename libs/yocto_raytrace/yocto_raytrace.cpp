@@ -86,57 +86,58 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
   if (bounce >= params.bounces) return {radiance.x, radiance.y, radiance.z, 1};
 
   auto outgoing = -ray.d;
+
+  if (!shape.points.empty()) {
+    normal = -ray.d;
+  } else if (!shape.lines.empty()) {
+    normal = orthonormalize(-ray.d, normal);
+  } else if (!shape.triangles.empty()) {
+    if (dot(-ray.d, normal) < 0) {
+      normal = -normal;
+    }
+  }
+
   switch (material.type) {
     case material_type::matte: {
-      auto incoming = sample_hemisphere(normal, rand2f(rng));
-      radiance += (2 * pi) * color / pi *
+      auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
+      radiance += color *
                   xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                      bounce + 1, rng, params)) *
-                  dot(normal, incoming);
+                      bounce + 1, rng, params));
       break;
     }
     case material_type::reflective: {
+      auto mnormal = normal;
       if (material.roughness > 0) {
-        auto incoming = sample_hemisphere_cospower(
+        mnormal = sample_hemisphere_cospower(
             2 / pow(material.roughness, 2), normal, rand2f(rng));
-        auto halfway  = normalize(outgoing + incoming);
-        radiance +=
-            (2 * pi) * fresnel_schlick(color, halfway, outgoing) *
-            microfacet_distribution(material.roughness, normal, halfway) *
-            microfacet_shadowing(
-                material.roughness, normal, halfway, outgoing, incoming) /
-            (4 * dot(normal, outgoing) * dot(normal, incoming)) *
-            xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                bounce + 1, rng, params)) *
-            dot(normal, incoming);
+      }
+      auto incoming = reflect(outgoing, mnormal);
+      radiance += fresnel_schlick(color, mnormal, outgoing) *
+                  xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
+                      bounce + 1, rng, params));
+      break;
+    }
+    case material_type::glossy: {
+      auto mnormal = sample_hemisphere_cospower(
+          2 / pow(material.roughness, 2), normal, rand2f(rng));
+      auto rand = vec3f{rand1f(rng)};
+      auto f    = fresnel_schlick(vec3f{0.04}, mnormal, outgoing);
+      if (rand.x < f.x && rand.y < f.y && rand.z < f.z) {
+        auto incoming = reflect(outgoing, mnormal);
+        radiance += xyz(shade_raytrace(
+            scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
       } else {
-        auto incoming = reflect(outgoing, normal);
-        radiance += fresnel_schlick(color, normal, outgoing) *
+        auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
+        radiance += color *
                     xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                         bounce + 1, rng, params));
       }
       break;
     }
-    case material_type::glossy: {
-      auto incoming = sample_hemisphere(normal, rand2f(rng));
-      auto halfway  = normalize(outgoing + incoming);
-      radiance +=
-          (2 * pi) *
-          (color / pi * (1 - fresnel_schlick(vec3f{0.04}, halfway, outgoing)) +
-              fresnel_schlick(vec3f{0.04}, halfway, outgoing) *
-                  microfacet_distribution(material.roughness, normal, halfway) *
-                  microfacet_shadowing(
-                      material.roughness, normal, halfway, outgoing, incoming) /
-                  (4 * dot(normal, outgoing) * dot(normal, incoming))) *
-          xyz(shade_raytrace(
-              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params)) *
-          dot(normal, incoming);
-      break;
-    }
     case material_type::transparent: {
-      auto min3f = min(
-          rand3f(rng), fresnel_schlick(vec3f{0.04}, normal, outgoing));
-      if (rand3f(rng) == min3f) {
+      auto rand = vec3f{rand1f(rng)};
+      auto f    = fresnel_schlick(vec3f{0.04}, normal, outgoing);
+      if (rand.x < f.x && rand.y < f.y && rand.z < f.z) {
         auto incoming = reflect(outgoing, normal);
         radiance += xyz(shade_raytrace(
             scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));

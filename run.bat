@@ -1,7 +1,7 @@
-::"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_color_720_9.jpg --samples 9 --shader color --resolution 150
-::"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_normal_720_9.jpg --samples 9 --shader normal --resolution 150
-::"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_texcoord_720_9.jpg --samples 9 --shader texcoord --resolution 150
-::"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_eyelight_720_9.jpg --samples 9 --shader eyelight --resolution 150
+"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_color_720_9.jpg --samples 9 --shader color --resolution 720
+"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_normal_720_9.jpg --samples 9 --shader normal --resolution 720
+"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_texcoord_720_9.jpg --samples 9 --shader texcoord --resolution 720
+"bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_eyelight_720_9.jpg --samples 9 --shader eyelight --resolution 720
 
 ::GOTO end 720->150
 "bin\yraytrace" --scene tests\01_cornellbox\cornellbox.json --output out\lowres\01_cornellbox_512_256.jpg --samples 256 --resolution 720
