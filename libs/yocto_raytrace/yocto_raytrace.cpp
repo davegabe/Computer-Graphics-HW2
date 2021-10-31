@@ -59,6 +59,20 @@ static ray3f eval_camera(const camera_data& camera, const vec2f& uv) {
 // -----------------------------------------------------------------------------
 namespace yocto {
 
+vec3f refract2(const vec3f& uv, const vec3f& n, double etai_over_etat) {
+  auto  cos_theta      = fmin(dot(-uv, n), 1.0);
+  vec3f r_out_perp     = etai_over_etat * (uv + cos_theta * n);
+  vec3f r_out_parallel = -sqrt(fabs(1.0 - length_squared(r_out_perp))) * n;
+  return r_out_perp + r_out_parallel;
+}
+
+static double reflectance(double cosine, double ref_idx) {
+  // Use Schlick's approximation for reflectance.
+  auto r0 = (1 - ref_idx) / (1 + ref_idx);
+  r0      = r0 * r0;
+  return r0 + (1 - r0) * pow((1 - cosine), 5);
+}
+
 // Raytrace renderer.
 static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     const ray3f& ray, int bounce, rng_state& rng,
@@ -112,7 +126,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
             2 / pow(material.roughness, 2), normal, rand2f(rng));
       }
       auto incoming = reflect(outgoing, mnormal);
-      radiance += fresnel_schlick(color, mnormal, outgoing) *
+      radiance += color *
                   xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                       bounce + 1, rng, params));
       break;
@@ -147,6 +161,30 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
                     xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                         bounce + 1, rng, params));
       }
+      break;
+    }
+    case material_type::refractive: {
+      if (abs(material.ior - 1) < 1e-3)
+        return vec4f{-outgoing.x, -outgoing.y, -outgoing.z, 1};
+      vec3f  incoming;
+      auto   entering       = dot(outgoing, normal) >= 0;
+      auto   up_normal      = entering ? normal : -normal;
+      auto   rel_ior        = entering ? (1.0f / material.ior) : material.ior;
+      double cos_theta      = fmin(dot(-outgoing, up_normal), 1.0);
+      double sin_theta      = sqrt(1.0 - cos_theta * cos_theta);
+      bool   cannot_refract = rel_ior * sin_theta > 1.0;
+
+      if (cannot_refract || /*reflectance(cos_theta, rel_ior)*/
+          fresnel_schlick(vec3f{0.04f}, up_normal, outgoing).x > rand1f(rng)) {
+        incoming = reflect(outgoing, up_normal);
+      } else {
+        incoming = refract(outgoing, up_normal, rel_ior);
+      }
+
+      radiance += color *
+                  xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
+                      bounce + 1, rng, params));
+
       break;
     }
   }
