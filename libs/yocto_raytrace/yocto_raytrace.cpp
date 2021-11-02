@@ -164,8 +164,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       break;
     }
     case material_type::refractive: {
-      if (abs(material.ior - 1) < 1e-3)
-        return vec4f{-outgoing.x, -outgoing.y, -outgoing.z, 1};
       vec3f  incoming;
       auto   entering       = dot(outgoing, normal) >= 0;
       auto   up_normal      = entering ? normal : -normal;
@@ -174,8 +172,9 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       double sin_theta      = sqrt(1.0 - cos_theta * cos_theta);
       bool   cannot_refract = rel_ior * sin_theta > 1.0;
 
-      if (cannot_refract || /*reflectance(cos_theta, rel_ior)*/
-          fresnel_schlick(vec3f{0.04f}, up_normal, outgoing).x > rand1f(rng)) {
+      if (cannot_refract ||
+          rand1f(rng) >
+              fresnel_schlick(vec3f{rel_ior}, up_normal, outgoing).x) {
         incoming = reflect(outgoing, up_normal);
       } else {
         incoming = refract(outgoing, up_normal, rel_ior);
@@ -184,7 +183,69 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       radiance += color *
                   xyz(shade_raytrace(scene, bvh, ray3f{position, incoming},
                       bounce + 1, rng, params));
+      break;
+    }
+    case material_type::volumetric: {
+      /*
+        [NUOVO METODO] [DA PROVARE]
+        - Se è entrante => (
+            non faccio nulla e richiamo il raycaster su ray3f{position, ray.d}
+          )
 
+        - Se è uscente  => (
+            faccio i calcoli sulla distanza del ray
+          )
+      */
+      material.density = vec3f{0.99, 0.99, 0.99};
+      auto isec2       = intersect_bvh(
+          bvh, scene, isec.instance, ray3f{position, ray.d});
+
+      float max_distance;
+      vec3f p1;
+      if (isec2.hit) {  // se ho colpito la stessa istanza
+        // sono sull'altra facciata
+        p1 = transform_point(
+            instance.frame, eval_position(shape, isec2.element, isec2.uv));
+        max_distance = distance(p1, position);  // o da invertire
+      } else {                                  // ero interno all'istanza
+        p1           = position;
+        max_distance = isec.distance;
+      }
+
+      auto probab = eval_transmittance(material.density, max_distance);
+
+      /*printf("TEST p: %f %f %f | %f | d: %f %f %f\n", probab.x, probab.y,
+         probab.z, distance, material.density.x, material.density.y,
+          material.density.z);*/
+      if (fmod(rand1f(rng), 1) > sum(probab) / 3) {
+        auto distance = sample_transmittance(
+            material.density, max_distance, rand1f(rng), rand1f(rng));
+        vec3f origin = position + distance * ray.d;  // (?)
+        vec3f incoming;
+        while (true) {
+          incoming = vec3f{fmod(rand1f(rng), 2.0f) - 1,
+              fmod(rand1f(rng), 2.0f) - 1, fmod(rand1f(rng), 2.0f) - 1};
+          if (pow(incoming.x, 2) + pow(incoming.y, 2) + pow(incoming.z, 2) >=
+              1) {
+            continue;
+          }
+          break;
+        }
+        radiance += /*vec3f{0, 0, 1};*/
+            color *
+            xyz(shade_raytrace(scene, bvh,
+                ray3f{origin, incoming},  // se metto origin questo
+                                          // colpirà nuovamente l'istanza è
+                                          // risolvibile mettendo l'hit su una
+                                          // sola faccia come transparent
+                bounce + 1, rng, params));
+
+      } else {       // se non scattero, proietto oltre l'istanza
+        radiance +=  // forse con color *
+                     /*vec3f{0, 1, 0};*/
+            xyz(shade_raytrace(
+                scene, bvh, ray3f{position, ray.d}, bounce + 1, rng, params));
+      }
       break;
     }
   }

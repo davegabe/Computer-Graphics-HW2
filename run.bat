@@ -18,3 +18,7 @@
 "bin\yraytrace" --scene tests\12_ecosys\ecosys.json --output out\lowres\12_ecosys_720_256.jpg --samples 256 --resolution 720
 :::end
 "bin\yraytrace" --scene tests\08_glass\refract.json --output out\lowres\refract_720_256.jpg --samples 256 --bounces  8 --resolution 720
+"bin\yraytrace" --scene tests\08_glass\volume.json --output out\lowres\volume_720_256.jpg --samples 256 --bounces  8 --resolution 720
+
+"bin\yraytrace" --scene tests\01_cornellbox\volume_cornellbox.json --output out\lowres\volume_cornell_720_256.jpg --samples 256 --bounces  8 --resolution 720
+"bin\yraytrace" --scene tests\02_matte\volume.json --output out\lowres\volume_matte.jpg --samples 256 --bounces  8 --resolution 720

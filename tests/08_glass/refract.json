@@ -65,28 +65,26 @@
         },
         {
             "name": "bunny1",
-            "color": [ 0.25, 0.5, 0.25 ],
+            "color": [ 1, 1, 1 ],
+            "color_tex": 1,
             "roughness": 0.1,
             "type": "matte"
         },
         {
             "name": "sphere1",
             "type": "refractive",
-            "ior": 1.5,
-            "color": [ 1, 1, 1 ],
+            "color": [ 0.75, 0.25, 0.25 ],
             "roughness": 0
         },
         {
             "name": "bunny2",
-            "color": [ 1, 1, 1 ],
-            "color_tex": 1,
+            "color": [ 0.25, 0.5, 0.25 ],
             "type": "matte"
         },
         {
             "name": "sphere2",
             "type": "refractive",
-            "ior": 0.04,
-            "color": [ 0.75, 0.25, 0.25 ],
+            "color": [ 1, 1, 1 ],
             "roughness": 0
         },
         {
