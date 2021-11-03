@@ -66,9 +66,9 @@
         {
             "name": "light",
             "emission": [
-                17.0,
-                17.0,
-                17.0
+                20,
+                20,
+                20
             ],
             "type": "matte"
         },
@@ -84,8 +84,8 @@
         {
             "name": "shortbox",
             "color": [
-                1,
-                1,
+                0,
+                0,
                 1
             ],
             "type": "volumetric"
@@ -136,6 +136,16 @@
     ],
     "instances": [
         {
+            "name": "shortbox",
+            "material": 6,
+            "shape": 6
+        },
+        {
+            "name": "tallbox",
+            "material": 7,
+            "shape": 7
+        },
+        {
             "name": "backwall",
             "material": 0,
             "shape": 0
@@ -164,16 +174,6 @@
             "name": "rightwall",
             "material": 5,
             "shape": 5
-        },
-        {
-            "name": "shortbox",
-            "material": 6,
-            "shape": 6
-        },
-        {
-            "name": "tallbox",
-            "material": 7,
-            "shape": 7
         }
     ]
 }

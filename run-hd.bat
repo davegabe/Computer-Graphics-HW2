@@ -37,3 +37,4 @@
 "bin\yraytrace" --scene tests\07_plastic\plastic.json --output out\highres\07_plastic_1280_4096.jpg --samples 4096 --resolution 1280
 "bin\yraytrace" --scene tests\11_bathroom1\bathroom1.json --output out\highres\11_bathroom1_1280_4096.jpg --samples 4096 --bounces 8 --resolution 1280
 
+"bin\yraytrace" --scene tests\01_cornellbox\volume_cornellbox.json --output out\lowres\volume_cornell_720_256_hd_final.jpg --samples 1024 --bounces 64 --resolution 1280
