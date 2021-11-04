@@ -172,24 +172,15 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       break;
     }
     case material_type::volumetric: {
-      /*
-        [NUOVO METODO] [DA PROVARE]
-        - Se è entrante => (
-            non faccio nulla e richiamo il raycaster su ray3f{position, ray.d}
-          )
-
-        - Se è uscente  => (
-            faccio i calcoli sulla distanza del ray
-          )
-      */
       material.density = vec3f{0.5, 0.5, 0.5};
-      auto isec2       = intersect_bvh(
+      // material.density = vec3f{0.99, 0.99, 0.99};
+      auto isec2 = intersect_bvh(
           bvh, scene, isec.instance, ray3f{position, ray.d});
 
       float max_distance;
       vec3f p1;
 
-      if (isec2.hit) {  // sono sull'altra facciata (uscita)
+      if (isec2.hit) {  // ero fuori dall'istanza
         p1 = transform_point(
             instance.frame, eval_position(shape, isec2.element, isec2.uv));
         max_distance = distance(p1, position);
@@ -200,23 +191,25 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         max_distance = isec.distance;
       }
 
-      auto probab = eval_transmittance(material.density, max_distance);
+      auto probab = eval_transmittance(
+          material.density, max_distance);  // calcolo probabilità scattering
 
-      if (fmod(rand1f(rng), 1)+0.15f > sum(probab) / 3) {
-        /*auto  distance = max_distance / 2;
-        vec3f origin   = position + distance * ray.d;*/
-
-        auto distance = sample_transmittance(
+      if (fmod(rand1f(rng), 1) > sum(probab) / 3) {  // se scattera
+        auto  distance = sample_transmittance(  // calcolo distanza scattering
             material.density, max_distance, rand1f(rng), rand1f(rng));
-        vec3f origin = position + distance * ray.d;
+        vec3f origin   = position + distance * ray.d;
 
-        // origin = vec3f{// fix float moltiplication bug
-        //   clamp(origin.x, position.x + ray.tmin * (position.x < 0 ? 1 : -1),
-        //       p1.x + ray.tmin * (p1.x < 0 ? 1 : -1)),
-        //   clamp(origin.y, position.y + ray.tmin * (position.y < 0 ? 1 : -1),
-        //       p1.y + ray.tmin * (p1.y < 0 ? 1 : -1)),
-        //   clamp(origin.z, position.z + ray.tmin * (position.z < 0 ? 1 : -1),
-        //       p1.z + ray.tmin * (p1.z < 0 ? 1 : -1))};
+        auto min_x = min(position.x, p1.x);
+        auto max_x = max(position.x, p1.x);
+        auto min_y = min(position.y, p1.y);
+        auto max_y = max(position.y, p1.y);
+        auto min_z = min(position.z, p1.z);
+        auto max_z = max(position.z, p1.z);
+
+        origin = vec3f{// fix float moltiplication bug
+            clamp(origin.x, min_x + ray.tmin * 10, max_x - ray.tmin * 10),
+            clamp(origin.y, min_y + ray.tmin * 10, max_y - ray.tmin * 10),
+            clamp(origin.z, min_z + ray.tmin * 10, max_z - ray.tmin * 10)};
 
         vec3f incoming;
         while (true) {
@@ -229,43 +222,35 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
           break;
         }
 
-        //auto isec3 = intersect_bvh(
-        //    bvh, scene, isec.instance, ray3f{origin, incoming});
-        //vec3f p2 = origin;  // fallback per i casi speciali
-        //if (isec3.hit) {
-        //  p2 = transform_point(
-        //      instance.frame, eval_position(shape, isec3.element, isec3.uv));
-        //} else {
-        //  if (!isec2.hit) {
-        //    // se era 2d o ero dentro all'istanza
+        auto isec3 = intersect_bvh(
+            bvh, scene, isec.instance, ray3f{origin, incoming});
+        vec3f p2 = origin;  // fallback per i casi speciali
+        if (isec3.hit) {
+          p2 = transform_point(
+              instance.frame, eval_position(shape, isec3.element, isec3.uv));
+        }
+        // else {
+        //  if (!isec2.hit
+        //      /* se era 2d o ero dentro all'istanza */
+        //      || max_distance / 2 < ray.tmin
+        //      /* se ero troppo vicino al bordo */) {
         //  } else {
-        //    if (max_distance / 2 < ray.tmin) {
-        //      // se ero troppo vicino al bordo
-        //    } else {
-        //      /*printf("\nprobab: %f %f %f | %d \n", probab.x, probab.y,
-        //      probab.z, isec2.hit); printf("p0: %f %f %f | p1: %f %f %f \n",
-        //      position.x, position.y, position.z, p1.x, p1.y, p1.z); printf(
-        //          "origin: %f %f %f | ray.d: %f %f %f | dist: %f | max_dist: %f
-        //      \n", origin.x, origin.y, origin.z, ray.d.x, ray.d.y, ray.d.z,
-        //          distance, max_distance);
-        //      printf("QUESTO NON DOVREBBE MAI ACCADERE\n");*/
-        //    }
+        //    /*printf("\nprobab: %f %f %f | %d \n", probab.x, probab.y,
+        //    probab.z, isec2.hit); printf("p0: %f %f %f | p1: %f %f %f \n",
+        //    position.x, position.y, position.z, p1.x, p1.y, p1.z); printf(
+        //        "origin: %f %f %f | ray.d: %f %f %f | dist: %f | max_dist: %f
+        //    \n ", origin.x, origin.y, origin.z, ray.d.x, ray.d.y, ray.d.z,
+        //        distance, max_distance);
+        //    printf("QUESTO NON DOVREBBE MAI ACCADERE\n");*/
         //  }
         //}
-        //p2 -= ray.d * 1e-4f;
-        radiance += /*vec3f{0, 0, 1};*/
-            color *
-            xyz(shade_raytrace(scene, bvh,
-                ray3f{p1, incoming},  // se metto origin questo
-                                          // colpirà nuovamente l'istanza è
-                                          // risolvibile mettendo l'hit su una
-                                          // sola faccia come transparent
-                bounce + 1, rng, params));
-      } else {       // se non scattero, proietto oltre l'istanza
-        radiance +=  // forse con color *
-                     /*vec3f{0, 1, 0};*/
-            xyz(shade_raytrace(
-                scene, bvh, ray3f{p1, ray.d}, bounce + 1, rng, params));
+        //}
+        p2 -= ray.d * 1e-4f;  // fix bug intersezioni con pavimento
+        radiance += color * xyz(shade_raytrace(scene, bvh, ray3f{p2, incoming},
+                                bounce + 1, rng, params));
+      } else {  // se non scattero, proietto oltre l'istanza
+        radiance += xyz(shade_raytrace(
+            scene, bvh, ray3f{p1, ray.d}, bounce + 1, rng, params));
       }
       break;
     }
