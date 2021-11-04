@@ -172,9 +172,9 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       break;
     }
     case material_type::volumetric: {
-      material.density = vec3f{0.5, 0.5, 0.5};
-      // material.density = vec3f{0.99, 0.99, 0.99};
-      auto isec2 = intersect_bvh(
+      // material.density = vec3f{0.5, 0.5, 0.5};
+      material.density = vec3f{0.99, 0.99, 0.99};
+      auto isec2       = intersect_bvh(
           bvh, scene, isec.instance, ray3f{position, ray.d});
 
       float max_distance;
@@ -184,8 +184,8 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         p1 = transform_point(
             instance.frame, eval_position(shape, isec2.element, isec2.uv));
         max_distance = distance(p1, position);
-        p1 -= ray.d * 1e-4f;  // fix bug intersezioni con pavimento
-      } else {                // ero interno all'istanza
+        p1 -= ray.d * ray.tmin;  // fix bug intersezioni con pavimento
+      } else {                   // ero interno all'istanza
         p1           = position;
         position     = ray.o;
         max_distance = isec.distance;
@@ -194,7 +194,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       auto probab = eval_transmittance(
           material.density, max_distance);  // calcolo probabilità scattering
 
-      if (fmod(rand1f(rng), 1) > sum(probab) / 3) {  // se scattera
+      if (fmod(rand1f(rng), 1) + 0.05f > sum(probab) / 3) {  // se scattera
         auto  distance = sample_transmittance(  // calcolo distanza scattering
             material.density, max_distance, rand1f(rng), rand1f(rng));
         vec3f origin   = position + distance * ray.d;
@@ -245,7 +245,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         //  }
         //}
         //}
-        p2 -= ray.d * 1e-4f;  // fix bug intersezioni con pavimento
+        p2 -= ray.d * ray.tmin;  // fix bug intersezioni con pavimento
         radiance += color * xyz(shade_raytrace(scene, bvh, ray3f{p2, incoming},
                                 bounce + 1, rng, params));
       } else {  // se non scattero, proietto oltre l'istanza
