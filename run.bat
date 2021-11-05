@@ -3,7 +3,6 @@
 "bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_texcoord_720_9.jpg --samples 9 --shader texcoord --resolution 720
 "bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\0x_eyelight_720_9.jpg --samples 9 --shader eyelight --resolution 720
 
-::GOTO end 720->150
 "bin\yraytrace" --scene tests\01_cornellbox\cornellbox.json --output out\lowres\01_cornellbox_512_256.jpg --samples 256 --resolution 720
 "bin\yraytrace" --scene tests\02_matte\matte.json --output out\lowres\02_matte_720_256.jpg --samples 25 --resolution 720
 "bin\yraytrace" --scene tests\03_texture\texture.json --output out\lowres\03_texture_720_256.jpg --samples 256 --resolution 720
@@ -16,7 +15,7 @@
 "bin\yraytrace" --scene tests\10_hair\hair.json --output out\lowres\10_hair_720_256.jpg --samples 256 --resolution 720
 "bin\yraytrace" --scene tests\11_bathroom1\bathroom1.json --output out\lowres\11_bathroom1_720_256.jpg --samples 256 --bounces  8 --resolution 720
 "bin\yraytrace" --scene tests\12_ecosys\ecosys.json --output out\lowres\12_ecosys_720_256.jpg --samples 256 --resolution 720
-:::end
+
 "bin\yraytrace" --scene tests\08_glass\refract.json --output out\lowres\refract_720_256.jpg --samples 256 --bounces  8 --resolution 720
 "bin\yraytrace" --scene tests\08_glass\volume.json --output out\lowres\volume_720_256.jpg --samples 256 --bounces  8 --resolution 720
 

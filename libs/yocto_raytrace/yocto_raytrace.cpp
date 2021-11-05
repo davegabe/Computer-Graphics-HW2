@@ -120,9 +120,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     case material_type::glossy: {
       auto mnormal = sample_hemisphere_cospower(
           2 / pow(material.roughness, 2), normal, rand2f(rng));
-      auto rand = vec3f{rand1f(rng)};
-      auto f    = fresnel_schlick(vec3f{0.04}, mnormal, outgoing);
-      if (rand.x < f.x && rand.y < f.y && rand.z < f.z) {
+      if (rand1f(rng) < fresnel_schlick(vec3f{0.04}, mnormal, outgoing).x) {
         auto incoming = reflect(outgoing, mnormal);
         radiance += xyz(shade_raytrace(
             scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
@@ -135,9 +133,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       break;
     }
     case material_type::transparent: {
-      auto rand = vec3f{rand1f(rng)};
-      auto f    = fresnel_schlick(vec3f{0.04}, normal, outgoing);
-      if (rand.x < f.x && rand.y < f.y && rand.z < f.z) {
+      if (rand1f(rng) < fresnel_schlick(vec3f{0.04}, normal, outgoing).x) {
         auto incoming = reflect(outgoing, normal);
         radiance += xyz(shade_raytrace(
             scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
@@ -172,9 +168,9 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       break;
     }
     case material_type::volumetric: {
-      // material.density = vec3f{0.5, 0.5, 0.5};
-      material.density = vec3f{0.99, 0.99, 0.99};
-      auto isec2       = intersect_bvh(
+      material.density = vec3f{0.5, 0.5, 0.5};
+      // material.density = vec3f{0.99, 0.99, 0.99};
+      auto isec2 = intersect_bvh(
           bvh, scene, isec.instance, ray3f{position, ray.d});
 
       float max_distance;
@@ -229,22 +225,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
           p2 = transform_point(
               instance.frame, eval_position(shape, isec3.element, isec3.uv));
         }
-        // else {
-        //  if (!isec2.hit
-        //      /* se era 2d o ero dentro all'istanza */
-        //      || max_distance / 2 < ray.tmin
-        //      /* se ero troppo vicino al bordo */) {
-        //  } else {
-        //    /*printf("\nprobab: %f %f %f | %d \n", probab.x, probab.y,
-        //    probab.z, isec2.hit); printf("p0: %f %f %f | p1: %f %f %f \n",
-        //    position.x, position.y, position.z, p1.x, p1.y, p1.z); printf(
-        //        "origin: %f %f %f | ray.d: %f %f %f | dist: %f | max_dist: %f
-        //    \n ", origin.x, origin.y, origin.z, ray.d.x, ray.d.y, ray.d.z,
-        //        distance, max_distance);
-        //    printf("QUESTO NON DOVREBBE MAI ACCADERE\n");*/
-        //  }
-        //}
-        //}
         p2 -= ray.d * ray.tmin;  // fix bug intersezioni con pavimento
         radiance += color * xyz(shade_raytrace(scene, bvh, ray3f{p2, incoming},
                                 bounce + 1, rng, params));

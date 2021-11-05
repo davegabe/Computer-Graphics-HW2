@@ -29,7 +29,7 @@
 "bin\yraytrace" --scene tests\08_glass\glass.json --output out\highres\08_glass_1280_1024.jpg --samples 1024 --bounces 8 --resolution 1280
 "bin\yraytrace" --scene tests\09_opacity\opacity.json --output out\highres\09_opacity_1280_1024.jpg --samples 1024 --resolution 1280
 "bin\yraytrace" --scene tests\10_hair\hair.json --output out\highres\10_hair_1280_1024.jpg --samples 1024 --resolution 1280
-::da riprendere da qui
+
 "bin\yraytrace" --scene tests\11_bathroom1\bathroom1.json --output out\highres\11_bathroom1_1280_1024.jpg --samples 1024 --bounces 8 --resolution 1280 
 "bin\yraytrace" --scene tests\12_ecosys\ecosys.json --output out\highres\12_ecosys_1280_1024.jpg --samples 1024 --resolution 1280
 
